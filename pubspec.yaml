@@ -94,8 +94,9 @@ flutter:
     - assets/data/adhkar.json
     - assets/data/wazaif.json
     - assets/data/quran/
-    - assets/data/hadith/
-    - assets/fonts/
+    # TODO: Add when files uploaded
+    # - assets/data/hadith/
+    # - assets/fonts/
     # TODO: Add when binary upload available
     # - assets/audio/adhan_placeholder.wav
 
