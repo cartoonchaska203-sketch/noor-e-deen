@@ -1,56 +1,93 @@
-/// Prayer & reminder notification service — Phase 4 integration point.
+/// Prayer & reminder notification service (Phase 4: real implementation in
+/// [LocalNotificationService], see local_notification_service.dart).
 ///
-/// WHAT IT WILL DO (Phase 4):
-///   * Schedule exact-time prayer notifications (Fajr..Isha) with Adhan sound.
-///   * Per-prayer enable/disable, silent-mode behaviour, custom reminders.
+/// Capabilities:
+///   * Exact-time prayer alarms (Fajr..Isha) with Adhan tone.
+///   * Daily repeating reminders (ayah / hadith / dua of the day, custom).
+///   * Per-prayer enable/disable, quiet-hours respect, one-shot instant alerts.
 ///
-/// REQUIRED TO ACTIVATE:
-///   1. Add dependency: `flutter_local_notifications: ^18.0.0` (+ `timezone`).
-///   2. Android: request `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` permission
-///      in AndroidManifest.xml (Android 12+ needs user grant in settings).
-///   3. Android: create a notification channel "prayer_alarms" (importance max).
-///   4. iOS: request notification permission at runtime; add background modes
-///      if Adhan audio must play while the app is killed.
-///   5. Bundle an Adhan audio asset (licensed recitation) under assets/audio/.
-///
-/// Until then [DisabledNotificationService] is wired in: every call is a
+/// On platforms where the plugin cannot run (e.g. some desktop builds),
+/// [DisabledNotificationService] is wired in instead: every call is a
 /// documented no-op, so no UI button can promise something that does not work.
 abstract class NotificationService {
   Future<void> init();
+
+  /// True when the platform backend initialized successfully.
   Future<bool> get isSupported;
+
+  /// Ask the OS for notification (+ exact-alarm where applicable) permission.
+  Future<bool> requestPermission();
+
+  /// Schedule (or re-schedule) one prayer alarm.
   Future<void> schedulePrayerAlarm({
     required String prayerId,
     required DateTime time,
+    required String title,
+    required String body,
   });
+
   Future<void> cancelPrayerAlarm(String prayerId);
+
+  /// Daily repeating reminder at [hour]:[minute] local time.
+  Future<void> scheduleDailyReminder({
+    required String id,
+    required String title,
+    required String body,
+    required int hour,
+    required int minute,
+  });
+
+  Future<void> cancelReminder(String id);
+
+  /// Fire-and-forget heads-up notification right now.
+  Future<void> showInstant({
+    required String title,
+    required String body,
+  });
+
   Future<void> cancelAll();
 }
 
-/// Phase 1 implementation: honestly disabled.
+/// Fallback implementation: honestly disabled.
 class DisabledNotificationService implements NotificationService {
   @override
-  Future<void> init() async {
-    // Intentionally empty until Phase 4.
-  }
+  Future<void> init() async {}
 
   @override
   Future<bool> get isSupported async => false;
 
   @override
+  Future<bool> requestPermission() async => false;
+
+  @override
   Future<void> schedulePrayerAlarm({
     required String prayerId,
     required DateTime time,
-  }) async {
-    // No-op: prayer alarms arrive in Phase 4.
-  }
+    required String title,
+    required String body,
+  }) async {}
 
   @override
-  Future<void> cancelPrayerAlarm(String prayerId) async {
-    // No-op.
-  }
+  Future<void> cancelPrayerAlarm(String prayerId) async {}
 
   @override
-  Future<void> cancelAll() async {
-    // No-op.
-  }
+  Future<void> scheduleDailyReminder({
+    required String id,
+    required String title,
+    required String body,
+    required int hour,
+    required int minute,
+  }) async {}
+
+  @override
+  Future<void> cancelReminder(String id) async {}
+
+  @override
+  Future<void> showInstant({
+    required String title,
+    required String body,
+  }) async {}
+
+  @override
+  Future<void> cancelAll() async {}
 }
