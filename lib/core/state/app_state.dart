@@ -19,10 +19,24 @@ class AppState extends ChangeNotifier {
   static const _kLocationMode = 'location_mode';
   static const _kManualCity = 'manual_city';
   static const _kAdjustPrefix = 'adjust_';
+  static const _kNotifMaster = 'notif_master';
+  static const _kNotifPrayerPrefix = 'notif_prayer_';
+  static const _kNotifDailyPrefix = 'notif_daily_';
+  static const _kQuietStart = 'quiet_start'; // minutes since midnight
+  static const _kQuietEnd = 'quiet_end';
 
   static const List<String> prayerKeys = [
     'fajr',
     'sunrise',
+    'dhuhr',
+    'asr',
+    'maghrib',
+    'isha',
+  ];
+
+  /// Prayers that can raise alarms (sunrise excluded).
+  static const List<String> alarmPrayers = [
+    'fajr',
     'dhuhr',
     'asr',
     'maghrib',
@@ -38,6 +52,17 @@ class AppState extends ChangeNotifier {
   Map<String, int> adjustments = {
     for (final k in prayerKeys) k: 0,
   };
+
+  // --- Phase 4: notification preferences ---
+  bool notifMaster = false;
+  Map<String, bool> prayerAlarms = {for (final k in alarmPrayers) k: true};
+  Map<String, bool> dailyReminders = {
+    'ayah': true,
+    'hadith': true,
+    'dua': false,
+  };
+  int quietStart = 23 * 60; // 23:00
+  int quietEnd = 4 * 60 + 30; // 04:30
 
   bool _loaded = false;
   bool get loaded => _loaded;
@@ -57,6 +82,16 @@ class AppState extends ChangeNotifier {
       for (final k in prayerKeys) {
         adjustments[k] = prefs.getInt('$_kAdjustPrefix$k') ?? 0;
       }
+      notifMaster = prefs.getBool(_kNotifMaster) ?? false;
+      for (final k in alarmPrayers) {
+        prayerAlarms[k] = prefs.getBool('$_kNotifPrayerPrefix$k') ?? true;
+      }
+      for (final k in dailyReminders.keys) {
+        dailyReminders[k] =
+            prefs.getBool('$_kNotifDailyPrefix$k') ?? (k != 'dua');
+      }
+      quietStart = prefs.getInt(_kQuietStart) ?? 23 * 60;
+      quietEnd = prefs.getInt(_kQuietEnd) ?? (4 * 60 + 30);
     } catch (_) {
       // Storage failure: keep compiled-in defaults.
     }
@@ -76,6 +111,15 @@ class AppState extends ChangeNotifier {
       for (final k in prayerKeys) {
         await prefs.setInt('$_kAdjustPrefix$k', adjustments[k] ?? 0);
       }
+      await prefs.setBool(_kNotifMaster, notifMaster);
+      for (final e in prayerAlarms.entries) {
+        await prefs.setBool('$_kNotifPrayerPrefix${e.key}', e.value);
+      }
+      for (final e in dailyReminders.entries) {
+        await prefs.setBool('$_kNotifDailyPrefix${e.key}', e.value);
+      }
+      await prefs.setInt(_kQuietStart, quietStart);
+      await prefs.setInt(_kQuietEnd, quietEnd);
     } catch (_) {
       // Non-fatal: settings simply won't survive a restart.
     }
@@ -127,6 +171,45 @@ class AppState extends ChangeNotifier {
     adjustments[prayerKey] = minutes.clamp(-30, 30);
     notifyListeners();
     _persist();
+  }
+
+  // --- Phase 4: notification preference mutators ---
+  void setNotifMaster(bool v) {
+    notifMaster = v;
+    notifyListeners();
+    _persist();
+  }
+
+  bool isPrayerAlarmEnabled(String prayerId) =>
+      notifMaster && (prayerAlarms[prayerId] ?? false);
+
+  void setPrayerAlarm(String prayerId, bool v) {
+    prayerAlarms[prayerId] = v;
+    notifyListeners();
+    _persist();
+  }
+
+  void setDailyReminder(String id, bool v) {
+    dailyReminders[id] = v;
+    notifyListeners();
+    _persist();
+  }
+
+  void setQuietHours(int startMinutes, int endMinutes) {
+    quietStart = startMinutes;
+    quietEnd = endMinutes;
+    notifyListeners();
+    _persist();
+  }
+
+  /// True when [time] falls inside the user's quiet window.
+  /// Handles overnight windows (e.g. 23:00–04:30).
+  bool isQuietTime(DateTime time) {
+    final m = time.hour * 60 + time.minute;
+    if (quietStart <= quietEnd) {
+      return m >= quietStart && m < quietEnd;
+    }
+    return m >= quietStart || m < quietEnd;
   }
 }
 
